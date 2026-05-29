@@ -46,6 +46,9 @@ export default function App() {
   const [customPromptNuance, setCustomPromptNuance] = useState<string>(() => {
     return localStorage.getItem('alex_recipient_nuance') || 'calm';
   });
+  const [customGeminiApiKey, setCustomGeminiApiKey] = useState<string>(() => {
+    return localStorage.getItem('alex_gemini_api_key') || '';
+  });
 
   // Current Card State
   const [currentMessage, setCurrentMessage] = useState<GeneratedMessage>(() => {
@@ -104,6 +107,10 @@ export default function App() {
   }, [customPromptNuance]);
 
   useEffect(() => {
+    localStorage.setItem('alex_gemini_api_key', customGeminiApiKey);
+  }, [customGeminiApiKey]);
+
+  useEffect(() => {
     localStorage.setItem('alex_messages_history', JSON.stringify(messageHistory));
   }, [messageHistory]);
 
@@ -126,33 +133,138 @@ export default function App() {
   // Perform automatic generation upon configuration adjustments
   const triggerAutoMessage = async (chosenTime: TimeOfDay, chosenStyle: MessageStyle) => {
     setIsLoading(true);
-    try {
-      // API call to Express proxy
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          timeOfDay: chosenTime,
-          style: chosenStyle,
-          modelOption,
-          recipientName: customRecipient,
-          nuance: customPromptNuance
-        })
-      });
+    let success = false;
+    let dataPayload: any = null;
 
-      if (!response.ok) {
-        throw new Error("HTTP Response Error");
+    // 1. Try Client-side Direct API call first if a custom key is saved in browser
+    if (customGeminiApiKey && customGeminiApiKey.trim() !== "") {
+      try {
+        const apiKey = customGeminiApiKey.trim();
+        const modelName = modelOption === 'pro' ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+        const timeLabel = MOMENTS_OF_DAY.find(m => m.key === chosenTime)?.name || chosenTime;
+        const styleObj = MESSAGE_STYLES.find(s => s.key === chosenStyle);
+        const styleText = styleObj ? `${styleObj.name} (${styleObj.description})` : chosenStyle;
+
+        let systemInstruction = `Eres un escritor poético contemporáneo extraordinariamente sensible, sofisticado e inteligente para la aplicación "ALEX Messages".
+Tu voz es madura, humana, delicada y psicológicamente envolvente. Evitas la exageración, la cursilería comercial, el exceso de adulación y la dependencia de las palabras de siempre.
+
+TU MISIÓN:
+Escribir un mensaje romántico sutil, poético y emocionalmente envolvente. Debe estar escrito de manera INDIRECTA, esquivando declaraciones burdas o explícitas. El propósito real es hacer sentir a la otra persona especial, profundamente acompañada, en paz y mentalmente conectada contigo, creando de forma natural una hermosa rutina emocional o "adicción saludable" por leer tus líneas cada día.`;
+
+        if (customRecipient) {
+          systemInstruction += `\nLa persona destinataria se llama "${customRecipient}". Puedes incorporar sutilmente su nombre o referirte a ella con complicidad poética.`;
+        }
+        
+        const nuanceTextMap: Record<string, string> = {
+          calm: "Sé independiente, maduro, entregando presencia serena y equilibrada sin asfixiar.",
+          mystic: "Sé místico, poético, con misterio denso y alta sensibilidad estética.",
+          tender: "Sé sumamente íntimo, tierno, con la calidez hogareña de un refugio seguro.",
+          distance: "Sé tierno y reconfortante acortando las millas que separan los corazones a distancia."
+        };
+        if (nuanceTextMap[customPromptNuance] && nuanceTextMap[customPromptNuance].trim() !== "") {
+          systemInstruction += `\nEstilo de personalidad para esta generación: ${nuanceTextMap[customPromptNuance]}`;
+        }
+
+        systemInstruction += `\n\nREGLAS DE CONTENIDO:
+1. NUNCA uses ningún emoji en el mensaje.
+2. NUNCA uses declaraciones obvias, sentimentalerías baratas o frases simplistas (ej. "me gustas", "te amo", "te quiero mucho").
+3. QUEDAN ESTRICTAMENTE PROHIBIDAS las siguientes frases o variaciones de significado:
+   - "sé que no podemos"
+   - "ya hablamos de eso"
+   - "me gustas"
+   - "te amo"
+4. Sonar como un adulto con alta inteligencia emocional: sin celos, sin control afectivo, sin dramatizar la distancia. Solo calidez, presencia calma, misterio sofisticado y atención.
+5. El mensaje debe ser sumamente sutil. Quien lo lea debe sentir un vuelco tierno en el pecho, esbozar una leve sonrisa o sumergirse en una pequeña meditación poética.
+6. La extensión máxima debe ser de una a tres líneas cortas y fluidas. No satures. Menos es más.
+
+REQUISITO METAFÓRICO:
+Sutiliza el mensaje fundiéndolo orgánicamente con el momento del día solicitado y el tono emocional solicitado.`;
+
+        const prompt = `Genera un mensaje original para el momento: "${timeLabel}" bajo el estilo emocional: "${styleText}".
+
+Debes responder estrictamente en formato JSON utilizando el siguiente esquema:
+{
+  "message": "El mensaje poético e indirecto sin un solo emoji.",
+  "atmosphereSuggestion": "Sugerencia del ambiente cinematográfico-visual muy breve y estética en español (ej. 'luz dorada de las cuatro filtrándose en el café')",
+  "colorAccent": "Un color hexadecimal elegante (tipo #color) inspirado en ese momento"
+}`;
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              { parts: [{ text: prompt }] }
+            ],
+            systemInstruction: {
+              parts: [{ text: systemInstruction }]
+            },
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "OBJECT",
+                properties: {
+                  message: { type: "STRING" },
+                  atmosphereSuggestion: { type: "STRING" },
+                  colorAccent: { type: "STRING" }
+                },
+                required: ["message", "atmosphereSuggestion", "colorAccent"]
+              },
+              temperature: 1.0
+            }
+          })
+        });
+
+        if (response.ok) {
+          const json = await response.json();
+          const textOutput = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (textOutput) {
+            dataPayload = JSON.parse(textOutput.trim());
+            success = true;
+          }
+        } else {
+          console.warn("La API Key directa de Gemini devolvió error. Tratando de reintentar por servidor.");
+        }
+      } catch (browserErr) {
+        console.warn("Fallo en llamada directa de navegador a Gemini:", browserErr);
       }
+    }
 
-      const data = await response.json();
-      
+    // 2. Fallback to Express backend/Vercel serverless function `/api/generate`
+    if (!success) {
+      try {
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            timeOfDay: chosenTime,
+            style: chosenStyle,
+            modelOption,
+            recipientName: customRecipient,
+            nuance: customPromptNuance
+          })
+        });
+
+        if (response.ok) {
+          dataPayload = await response.json();
+          success = true;
+        }
+      } catch (serverErr) {
+        console.warn("Fallo al contactar con el servidor /api/generate:", serverErr);
+      }
+    }
+
+    // 3. Process the successful result or go to local manual template fallback
+    if (success && dataPayload) {
       const newMsg: GeneratedMessage = {
         id: `msg-${Date.now()}`,
-        text: data.message,
+        text: dataPayload.message,
         timeOfDay: chosenTime,
         style: chosenStyle,
-        atmosphereSuggestion: data.atmosphereSuggestion,
-        colorAccent: data.colorAccent || '#F59E0B',
+        atmosphereSuggestion: dataPayload.atmosphereSuggestion,
+        colorAccent: dataPayload.colorAccent || '#F59E0B',
         isFavorite: false,
         createdAt: new Date().toISOString()
       };
@@ -160,7 +272,7 @@ export default function App() {
       setCurrentMessage(newMsg);
       // Append to memory history
       setMessageHistory(prev => [newMsg, ...prev.slice(0, 49)]); // keep last 50
-    } catch (err) {
+    } else {
       // Fine-grained beautiful human fallback without failing
       const momentDetails = getMomentDetails(chosenTime);
       const fallbackText = momentDetails.fallbackMessages[chosenStyle] || momentDetails.fallbackMessages.soft_romantic;
@@ -178,10 +290,9 @@ export default function App() {
 
       setCurrentMessage(newMsg);
       setMessageHistory(prev => [newMsg, ...prev.slice(0, 49)]);
-      showToast("Nota: Usando motor poético local sin conexión. Agrega tu API Key para activar la IA en vivo.");
-    } finally {
-      setIsLoading(false);
+      showToast("Nota: Usando motor poético local sin conexión. Configura tu API Key en los ajustes para activar la IA.");
     }
+    setIsLoading(false);
   };
 
   // Generar otro mensaje button click
@@ -885,6 +996,31 @@ export default function App() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* API Key configuration input for static deployments/Vercel */}
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-900">
+                  <label className="text-[11px] font-mono uppercase tracking-wider text-slate-400 block mb-1.5 flex items-center justify-between">
+                    <span>API KEY de Gemini (Propia Clave)</span>
+                    <a 
+                      href="https://aistudio.google.com/app/apikey" 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-[10px] text-rose-500 hover:underline cursor-pointer normal-case font-sans"
+                    >
+                      Obtener clave gratis →
+                    </a>
+                  </label>
+                  <input
+                    type="password"
+                    value={customGeminiApiKey}
+                    onChange={(e) => setCustomGeminiApiKey(e.target.value)}
+                    placeholder="AIzaSy..."
+                    className="w-full p-3 rounded-xl border border-slate-250 dark:border-slate-850 bg-stone-50/50 dark:bg-slate-900/50 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-400"
+                  />
+                  <span className="text-[10px] text-slate-400 font-light block mt-1 leading-normal">
+                    Obligatorio si usas la web desde Vercel sin servidor activo. Se almacena de forma segura en tu navegador.
+                  </span>
                 </div>
 
               </div>

@@ -79,6 +79,9 @@ app.post("/api/generate", async (req, res) => {
     if (!modelsToTry.includes("gemini-3.1-flash-lite")) {
       modelsToTry.push("gemini-3.1-flash-lite");
     }
+    if (!modelsToTry.includes("gemini-2.5-flash")) {
+      modelsToTry.push("gemini-2.5-flash");
+    }
 
     const client = getGeminiClient();
 
@@ -159,7 +162,7 @@ Debes responder estrictamente en formato JSON utilizando el siguiente esquema:
         console.log(`Successfully generated message using model: ${modelName}`);
         break; // Successfully generated content, break the loop
       } catch (err: any) {
-        console.warn(`Model ${modelName} failed generation or hit quota limits:`, err.message || err);
+        console.log(`Model ${modelName} encountered fallback scenario (retrying next):`, err.message || err);
         lastError = err;
       }
     }

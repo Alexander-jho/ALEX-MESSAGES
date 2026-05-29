@@ -69,6 +69,9 @@ export default async function handler(req: any, res: any) {
     if (!modelsToTry.includes("gemini-3.1-flash-lite")) {
       modelsToTry.push("gemini-3.1-flash-lite");
     }
+    if (!modelsToTry.includes("gemini-2.5-flash")) {
+      modelsToTry.push("gemini-2.5-flash");
+    }
 
     // Constructing system instructions explicitly detailing strict negative constraints
     let systemInstruction = `Eres un escritor poético contemporáneo extraordinariamente sensible, sofisticado e inteligente para la aplicación "ALEX Messages".
@@ -152,6 +155,7 @@ Debes responder estrictamente en formato JSON utilizando el siguiente esquema:
         successfulModel = modelName;
         break;
       } catch (err: any) {
+        console.log(`Vercel function model ${modelName} hit a transient issue (trying next if available):`, err.message || err);
         lastError = err;
       }
     }

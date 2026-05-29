@@ -140,7 +140,7 @@ export default function App() {
     if (customGeminiApiKey && customGeminiApiKey.trim() !== "") {
       try {
         const apiKey = customGeminiApiKey.trim();
-        const modelName = modelOption === 'pro' ? 'gemini-1.5-pro' : 'gemini-1.5-flash';
+        const modelName = modelOption === 'pro' ? 'gemini-3.1-pro-preview' : 'gemini-3.5-flash';
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
         const timeLabel = MOMENTS_OF_DAY.find(m => m.key === chosenTime)?.name || chosenTime;

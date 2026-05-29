@@ -1,0 +1,6 @@
+{
+  "name": "ALEX MESSAGES",
+  "description": "Una aplicación web elegante y moderna para generar mensajes románticos sutiles, poéticos y psicológicamente envolventes en tarjetas cinematográficas premium.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

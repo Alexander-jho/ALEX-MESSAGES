@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;450;550;600&family=Playfair+Display:ital,wght@0,450;0,550;1,400&family=JetBrains+Mono:wght@350;450&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Elegant scrollbars for premium feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Subtle animation keyframes for rain overlay or twilight dust */
+@keyframes atmospheric-drift {
+  0% { transform: translateY(0px) translateX(0px) scale(1); opacity: 0.3; }
+  50% { transform: translateY(-10px) translateX(5px) scale(1.05); opacity: 0.5; }
+  100% { transform: translateY(0px) translateX(0px) scale(1); opacity: 0.3; }
+}
+
+@keyframes slow-breathing {
+  0%, 100% { filter: brightness(1) contrast(1); }
+  50% { filter: brightness(1.08) contrast(0.98); }
+}
+
+@keyframes rain-fall {
+  0% { transform: translateY(-10%) rotate(15deg); opacity: 0.4; }
+  100% { transform: translateY(110%) rotate(15deg); opacity: 0.1; }
+}
+
+.animate-atmospheric-drift {
+  animation: atmospheric-drift 8s ease-in-out infinite;
+}
+
+.animate-slow-breathing {
+  animation: slow-breathing 4s ease-in-out infinite;
+}
+
+.rain-drop {
+  animation: rain-fall 1.5s linear infinite;
+}
